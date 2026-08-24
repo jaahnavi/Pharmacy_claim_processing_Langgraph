@@ -1,0 +1,237 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "LangGraph Pharmacy Claim Orchestration",
+    "description": "Educational demo only. Not for real insurance billing, medical advice, or PHI.\n\nCollection covers intake, status, approve/reject HITL, members, payer mock, and health.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000" },
+    { "key": "claim_id", "value": "" },
+    { "key": "reviewer_id", "value": "rev-001" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Members & Payer",
+      "item": [
+        {
+          "name": "GET Member MEM-10001",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/members/MEM-10001"
+          }
+        },
+        {
+          "name": "GET Payer Rules",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/payer/rules"
+          }
+        },
+        {
+          "name": "POST Payer Submit (mock)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claim_id\": \"demo\",\n  \"member\": { \"member_id\": \"MEM-10001\" },\n  \"drug\": { \"name\": \"atorvastatin\" },\n  \"coverage\": { \"coverage_status\": \"covered\" }\n}"
+            },
+            "url": "{{baseUrl}}/payer/submit"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Claims — Happy Path",
+      "item": [
+        {
+          "name": "1 Intake Happy Path (Lipitor)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Intake returns claim_id', function () {",
+                  "  var j = pm.response.json();",
+                  "  pm.expect(j.claim_id).to.be.ok;",
+                  "  pm.collectionVariables.set('claim_id', j.claim_id);",
+                  "  pm.expect(j.status).to.eql('awaiting_human_approval');",
+                  "  pm.expect(j.coverage.rationale).to.be.ok;",
+                  "  pm.expect(j.reviewer_brief).to.be.ok;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"member_id\": \"MEM-10001\",\n  \"patient_name\": \"Alex Demo\",\n  \"date_of_service\": \"2026-07-15\",\n  \"pharmacy_npi\": \"1679576722\",\n  \"prescriber_npi\": \"1679576722\",\n  \"ndc\": \"00071015523\",\n  \"drug_name\": \"Lipitor\",\n  \"quantity\": 30,\n  \"days_supply\": 30,\n  \"daw_code\": 0,\n  \"bin\": \"610014\",\n  \"pcn\": \"DEMO\",\n  \"group_id\": \"GRP-AAA\"\n}"
+            },
+            "url": "{{baseUrl}}/claims/intake"
+          }
+        },
+        {
+          "name": "2 GET Claim Status",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/claims/{{claim_id}}"
+          }
+        },
+        {
+          "name": "3 Approve Claim",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Submitted after approve', function () {",
+                  "  var j = pm.response.json();",
+                  "  pm.expect(j.status).to.eql('submitted');",
+                  "  pm.expect(j.submission.confirmation_id).to.be.ok;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reviewer_id\": \"{{reviewer_id}}\",\n  \"comment\": \"Member, drug, coverage, NPI, and LLM brief reviewed. Approve submission.\"\n}"
+            },
+            "url": "{{baseUrl}}/claims/{{claim_id}}/approve"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Claims — Reject Path",
+      "item": [
+        {
+          "name": "1 Intake Then Reject",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var j = pm.response.json();",
+                  "pm.collectionVariables.set('claim_id', j.claim_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"member_id\": \"MEM-10002\",\n  \"patient_name\": \"Jordan Demo\",\n  \"date_of_service\": \"2026-07-15\",\n  \"pharmacy_npi\": \"1679576722\",\n  \"prescriber_npi\": \"1679576722\",\n  \"drug_name\": \"atorvastatin\",\n  \"quantity\": 90,\n  \"days_supply\": 90,\n  \"bin\": \"610014\",\n  \"pcn\": \"DEMO\",\n  \"group_id\": \"GRP-AAA\"\n}"
+            },
+            "url": "{{baseUrl}}/claims/intake"
+          }
+        },
+        {
+          "name": "2 Reject Claim",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Rejected — no submit', function () {",
+                  "  var j = pm.response.json();",
+                  "  pm.expect(j.status).to.eql('human_rejected');",
+                  "  pm.expect(j.submission).to.not.have.property('confirmation_id');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reviewer_id\": \"{{reviewer_id}}\",\n  \"comment\": \"Quantity exceeds plan limit; request new Rx.\"\n}"
+            },
+            "url": "{{baseUrl}}/claims/{{claim_id}}/reject"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Claims — Error Paths",
+      "item": [
+        {
+          "name": "Unknown Member",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"member_id\": \"MEM-UNKNOWN\",\n  \"patient_name\": \"Unknown Demo\",\n  \"date_of_service\": \"2026-07-15\",\n  \"pharmacy_npi\": \"1679576722\",\n  \"prescriber_npi\": \"1679576722\",\n  \"drug_name\": \"atorvastatin\",\n  \"quantity\": 30,\n  \"days_supply\": 30,\n  \"bin\": \"610014\",\n  \"pcn\": \"DEMO\",\n  \"group_id\": \"GRP-AAA\"\n}"
+            },
+            "url": "{{baseUrl}}/claims/intake"
+          }
+        },
+        {
+          "name": "Unknown Drug",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"member_id\": \"MEM-10005\",\n  \"patient_name\": \"Casey Demo\",\n  \"date_of_service\": \"2026-07-15\",\n  \"pharmacy_npi\": \"1679576722\",\n  \"prescriber_npi\": \"1679576722\",\n  \"drug_name\": \"NotARealMedicationXYZ\",\n  \"quantity\": 30,\n  \"days_supply\": 30,\n  \"bin\": \"610014\",\n  \"pcn\": \"DEMO\",\n  \"group_id\": \"GRP-AAA\"\n}"
+            },
+            "url": "{{baseUrl}}/claims/intake"
+          }
+        },
+        {
+          "name": "Prior Auth Humira",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"member_id\": \"MEM-10003\",\n  \"patient_name\": \"Sam Demo\",\n  \"date_of_service\": \"2026-07-15\",\n  \"pharmacy_npi\": \"1679576722\",\n  \"prescriber_npi\": \"1679576722\",\n  \"drug_name\": \"Humira\",\n  \"quantity\": 2,\n  \"days_supply\": 28,\n  \"bin\": \"610014\",\n  \"pcn\": \"DEMO\",\n  \"group_id\": \"GRP-BBB\"\n}"
+            },
+            "url": "{{baseUrl}}/claims/intake"
+          }
+        },
+        {
+          "name": "Invalid NPI",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"member_id\": \"MEM-10001\",\n  \"patient_name\": \"Alex Demo\",\n  \"date_of_service\": \"2026-07-15\",\n  \"pharmacy_npi\": \"0000000000\",\n  \"prescriber_npi\": \"0000000000\",\n  \"drug_name\": \"atorvastatin\",\n  \"quantity\": 30,\n  \"days_supply\": 30,\n  \"bin\": \"610014\",\n  \"pcn\": \"DEMO\",\n  \"group_id\": \"GRP-AAA\"\n}"
+            },
+            "url": "{{baseUrl}}/claims/intake"
+          }
+        }
+      ]
+    }
+  ]
+}

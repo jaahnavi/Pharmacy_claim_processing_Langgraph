@@ -1,0 +1,508 @@
+{
+  "disclaimer": "Educational demo only. Synthetic data — no real PHI.",
+  "cases": [
+    {
+      "id": "E01_happy_approve",
+      "name": "Happy path approve — both LLMs present",
+      "request": {
+        "member_id": "MEM-10001",
+        "patient_name": "Alex Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "atorvastatin",
+        "quantity": 30,
+        "days_supply": 30,
+        "bin": "610014",
+        "pcn": "DEMO",
+        "group_id": "GRP-AAA"
+      },
+      "human_decision": "approve",
+      "expect": {
+        "await_hitl": true,
+        "require_llm1": true,
+        "require_llm2": true,
+        "coverage_status": "covered",
+        "final_status": "submitted",
+        "must_not_submit_without_approve": true
+      }
+    },
+    {
+      "id": "E02_happy_reject",
+      "name": "Happy path reject — no submit",
+      "request": {
+        "member_id": "MEM-10002",
+        "patient_name": "Jordan Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "atorvastatin",
+        "quantity": 90,
+        "days_supply": 90,
+        "bin": "610014",
+        "pcn": "DEMO",
+        "group_id": "GRP-AAA"
+      },
+      "human_decision": "reject",
+      "expect": {
+        "await_hitl": true,
+        "require_llm1": true,
+        "require_llm2": true,
+        "coverage_status": "covered",
+        "final_status": "human_rejected",
+        "submission_absent": true
+      }
+    },
+    {
+      "id": "E03_prior_auth",
+      "name": "Prior auth Humira",
+      "request": {
+        "member_id": "MEM-10003",
+        "patient_name": "Sam Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "Humira",
+        "quantity": 2,
+        "days_supply": 28,
+        "bin": "610014",
+        "pcn": "DEMO",
+        "group_id": "GRP-BBB"
+      },
+      "human_decision": "approve",
+      "expect": {
+        "await_hitl": true,
+        "require_llm1": true,
+        "require_llm2": true,
+        "coverage_status": "prior_auth_required",
+        "final_status": "submitted"
+      }
+    },
+    {
+      "id": "E04_unknown_member",
+      "name": "Unknown member — no LLM required",
+      "request": {
+        "member_id": "MEM-UNKNOWN",
+        "patient_name": "Unknown Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "atorvastatin",
+        "quantity": 30,
+        "days_supply": 30
+      },
+      "human_decision": null,
+      "expect": {
+        "await_hitl": false,
+        "require_llm1": false,
+        "require_llm2": false,
+        "member_ok": false,
+        "final_status_in": ["member_not_found"]
+      }
+    },
+    {
+      "id": "E05_unknown_drug",
+      "name": "Unknown drug — no LLM required",
+      "request": {
+        "member_id": "MEM-10005",
+        "patient_name": "Casey Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "NotARealMedicationXYZ",
+        "quantity": 30,
+        "days_supply": 30
+      },
+      "human_decision": null,
+      "expect": {
+        "await_hitl": false,
+        "require_llm1": false,
+        "require_llm2": false,
+        "drug_ok": false,
+        "final_status_in": ["drug_not_found"]
+      }
+    },
+    {
+      "id": "E06_invalid_npi",
+      "name": "Invalid NPI — LLM2 still runs, needs_review",
+      "request": {
+        "member_id": "MEM-10001",
+        "patient_name": "Alex Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "0000000000",
+        "prescriber_npi": "0000000000",
+        "drug_name": "atorvastatin",
+        "quantity": 30,
+        "days_supply": 30
+      },
+      "human_decision": "reject",
+      "expect": {
+        "await_hitl": true,
+        "require_llm1": true,
+        "require_llm2": true,
+        "provider_ok": false,
+        "coverage_status": "needs_review",
+        "final_status": "human_rejected"
+      }
+    },
+    {
+      "id": "E07_inactive_member",
+      "name": "Inactive member blocks fan-in",
+      "request": {
+        "member_id": "MEM-10004",
+        "patient_name": "Riley Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "metformin",
+        "quantity": 30,
+        "days_supply": 30
+      },
+      "human_decision": null,
+      "expect": {
+        "await_hitl": false,
+        "require_llm1": false,
+        "require_llm2": false,
+        "member_ok": false,
+        "final_status_in": ["member_inactive"]
+      }
+    },
+    {
+      "id": "E08_qty_over_limit",
+      "name": "Quantity over limit -> needs_review",
+      "request": {
+        "member_id": "MEM-10001",
+        "patient_name": "Alex Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "atorvastatin",
+        "quantity": 500,
+        "days_supply": 30
+      },
+      "human_decision": "request_changes",
+      "expect": {
+        "await_hitl": true,
+        "require_llm1": true,
+        "require_llm2": true,
+        "coverage_status": "needs_review",
+        "final_status": "human_changes_requested"
+      }
+    },
+    {
+      "id": "E09_llm_non_override",
+      "name": "LLM cannot change coverage_status vs rule_status",
+      "request": {
+        "member_id": "MEM-10001",
+        "patient_name": "Alex Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "Lipitor",
+        "ndc": "00071015523",
+        "quantity": 30,
+        "days_supply": 30
+      },
+      "human_decision": "approve",
+      "expect": {
+        "await_hitl": true,
+        "require_llm1": true,
+        "require_llm2": true,
+        "llm_non_override": true,
+        "final_status": "submitted"
+      }
+    },
+    {
+      "id": "E10_llm_force_fallback",
+      "name": "LLM force fallback templates still HITL",
+      "force_llm_fallback": true,
+      "request": {
+        "member_id": "MEM-10001",
+        "patient_name": "Alex Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "atorvastatin",
+        "quantity": 30,
+        "days_supply": 30
+      },
+      "human_decision": "approve",
+      "expect": {
+        "await_hitl": true,
+        "require_llm1": true,
+        "require_llm2": true,
+        "llm1_ok": false,
+        "llm2_ok": false,
+        "final_status": "submitted"
+      }
+    },
+    {
+      "id": "E11_metformin_covered",
+      "name": "Metformin preferred covered",
+      "request": {
+        "member_id": "MEM-10002",
+        "patient_name": "Jordan Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "metformin",
+        "quantity": 60,
+        "days_supply": 30
+      },
+      "human_decision": "approve",
+      "expect": {
+        "await_hitl": true,
+        "require_llm1": true,
+        "require_llm2": true,
+        "coverage_status": "covered",
+        "final_status": "submitted"
+      }
+    },
+    {
+      "id": "E12_ozempic_pa",
+      "name": "Ozempic prior auth",
+      "request": {
+        "member_id": "MEM-10003",
+        "patient_name": "Sam Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "Ozempic",
+        "quantity": 1,
+        "days_supply": 28
+      },
+      "human_decision": "reject",
+      "expect": {
+        "await_hitl": true,
+        "require_llm1": true,
+        "require_llm2": true,
+        "coverage_status": "prior_auth_required",
+        "submission_absent": true,
+        "final_status": "human_rejected"
+      }
+    },
+    {
+      "id": "E13_lisinopril",
+      "name": "Lisinopril covered approve",
+      "request": {
+        "member_id": "MEM-10001",
+        "patient_name": "Alex Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "lisinopril",
+        "quantity": 30,
+        "days_supply": 30
+      },
+      "human_decision": "approve",
+      "expect": {
+        "await_hitl": true,
+        "require_llm1": true,
+        "require_llm2": true,
+        "coverage_status": "covered",
+        "final_status": "submitted"
+      }
+    },
+    {
+      "id": "E14_parallel_fan_in",
+      "name": "Fan-in correctness — coverage after both branches",
+      "request": {
+        "member_id": "MEM-10005",
+        "patient_name": "Casey Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "omeprazole",
+        "quantity": 30,
+        "days_supply": 30
+      },
+      "human_decision": "approve",
+      "expect": {
+        "await_hitl": true,
+        "require_llm1": true,
+        "require_llm2": true,
+        "fan_in_messages": true,
+        "member_ok": true,
+        "drug_ok": true,
+        "final_status": "submitted"
+      }
+    },
+    {
+      "id": "E15_hitl_enforcement",
+      "name": "HITL — reject never submits",
+      "request": {
+        "member_id": "MEM-10001",
+        "patient_name": "Alex Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "sertraline",
+        "quantity": 30,
+        "days_supply": 30
+      },
+      "human_decision": "reject",
+      "expect": {
+        "await_hitl": true,
+        "require_llm1": true,
+        "require_llm2": true,
+        "submission_absent": true,
+        "final_status": "human_rejected"
+      }
+    },
+    {
+      "id": "E16_amlodipine",
+      "name": "Amlodipine covered",
+      "request": {
+        "member_id": "MEM-10002",
+        "patient_name": "Jordan Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "amlodipine",
+        "quantity": 30,
+        "days_supply": 30
+      },
+      "human_decision": "approve",
+      "expect": {
+        "await_hitl": true,
+        "require_llm1": true,
+        "require_llm2": true,
+        "coverage_status": "covered",
+        "final_status": "submitted"
+      }
+    },
+    {
+      "id": "E17_enbrel_pa",
+      "name": "Enbrel prior auth",
+      "request": {
+        "member_id": "MEM-10003",
+        "patient_name": "Sam Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "Enbrel",
+        "quantity": 4,
+        "days_supply": 28
+      },
+      "human_decision": "request_changes",
+      "expect": {
+        "await_hitl": true,
+        "require_llm1": true,
+        "require_llm2": true,
+        "coverage_status": "prior_auth_required",
+        "final_status": "human_changes_requested"
+      }
+    },
+    {
+      "id": "E18_provider_lookup",
+      "name": "Valid NPI provider_ok",
+      "request": {
+        "member_id": "MEM-10001",
+        "patient_name": "Alex Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "levothyroxine",
+        "quantity": 30,
+        "days_supply": 30
+      },
+      "human_decision": "approve",
+      "expect": {
+        "await_hitl": true,
+        "require_llm1": true,
+        "require_llm2": true,
+        "provider_ok": true,
+        "final_status": "submitted"
+      }
+    },
+    {
+      "id": "E19_nonpreferred_review",
+      "name": "Non-preferred drug needs_review",
+      "request": {
+        "member_id": "MEM-10001",
+        "patient_name": "Alex Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "ibuprofen",
+        "quantity": 30,
+        "days_supply": 30
+      },
+      "human_decision": "approve",
+      "expect": {
+        "await_hitl": true,
+        "require_llm1": true,
+        "require_llm2": true,
+        "coverage_status": "needs_review",
+        "final_status": "submitted"
+      }
+    },
+    {
+      "id": "E20_submit_block_check",
+      "name": "Awaiting approval has no submission",
+      "request": {
+        "member_id": "MEM-10001",
+        "patient_name": "Alex Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "atorvastatin",
+        "quantity": 30,
+        "days_supply": 30
+      },
+      "human_decision": null,
+      "expect": {
+        "await_hitl": true,
+        "require_llm1": true,
+        "require_llm2": true,
+        "stop_at_hitl": true,
+        "submission_absent": true
+      }
+    },
+    {
+      "id": "E21_dupixent_pa",
+      "name": "Dupixent prior auth approve",
+      "request": {
+        "member_id": "MEM-10003",
+        "patient_name": "Sam Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "Dupixent",
+        "quantity": 2,
+        "days_supply": 28
+      },
+      "human_decision": "approve",
+      "expect": {
+        "await_hitl": true,
+        "require_llm1": true,
+        "require_llm2": true,
+        "coverage_status": "prior_auth_required",
+        "final_status": "submitted"
+      }
+    },
+    {
+      "id": "E22_rationale_nonempty",
+      "name": "Rationale and brief non-empty on success",
+      "request": {
+        "member_id": "MEM-10002",
+        "patient_name": "Jordan Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "atorvastatin",
+        "quantity": 30,
+        "days_supply": 30
+      },
+      "human_decision": "approve",
+      "expect": {
+        "await_hitl": true,
+        "require_llm1": true,
+        "require_llm2": true,
+        "rationale_min_chars": 40,
+        "brief_min_chars": 40,
+        "final_status": "submitted"
+      }
+    }
+  ]
+}

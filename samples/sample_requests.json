@@ -1,0 +1,143 @@
+{
+  "disclaimer": "Educational demo only. Not for real insurance billing, medical advice, or PHI. Use synthetic member/claim data only.",
+  "samples": [
+    {
+      "id": "happy_path_covered",
+      "description": "Happy path — covered drug + valid NPIs",
+      "request": {
+        "member_id": "MEM-10001",
+        "patient_name": "Alex Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "ndc": "00071015523",
+        "drug_name": "Lipitor",
+        "quantity": 30,
+        "days_supply": 30,
+        "daw_code": 0,
+        "bin": "610014",
+        "pcn": "DEMO",
+        "group_id": "GRP-AAA"
+      }
+    },
+    {
+      "id": "drug_name_only",
+      "description": "Drug name only (no NDC)",
+      "request": {
+        "member_id": "MEM-10002",
+        "patient_name": "Jordan Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "atorvastatin",
+        "quantity": 90,
+        "days_supply": 90,
+        "bin": "610014",
+        "pcn": "DEMO",
+        "group_id": "GRP-AAA"
+      }
+    },
+    {
+      "id": "prior_auth",
+      "description": "Prior authorization required (Humira)",
+      "request": {
+        "member_id": "MEM-10003",
+        "patient_name": "Sam Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "Humira",
+        "quantity": 2,
+        "days_supply": 28,
+        "bin": "610014",
+        "pcn": "DEMO",
+        "group_id": "GRP-BBB"
+      }
+    },
+    {
+      "id": "unknown_member",
+      "description": "Unknown member — fan-in END, no LLM",
+      "request": {
+        "member_id": "MEM-UNKNOWN",
+        "patient_name": "Unknown Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "atorvastatin",
+        "quantity": 30,
+        "days_supply": 30,
+        "bin": "610014",
+        "pcn": "DEMO",
+        "group_id": "GRP-AAA"
+      }
+    },
+    {
+      "id": "unknown_drug",
+      "description": "Unknown drug — fan-in END, no LLM",
+      "request": {
+        "member_id": "MEM-10005",
+        "patient_name": "Casey Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "NotARealMedicationXYZ",
+        "quantity": 30,
+        "days_supply": 30,
+        "bin": "610014",
+        "pcn": "DEMO",
+        "group_id": "GRP-AAA"
+      }
+    },
+    {
+      "id": "invalid_npi",
+      "description": "Invalid provider NPI — needs_review; LLM2 still runs",
+      "request": {
+        "member_id": "MEM-10001",
+        "patient_name": "Alex Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "0000000000",
+        "prescriber_npi": "0000000000",
+        "drug_name": "atorvastatin",
+        "quantity": 30,
+        "days_supply": 30,
+        "bin": "610014",
+        "pcn": "DEMO",
+        "group_id": "GRP-AAA"
+      }
+    },
+    {
+      "id": "inactive_member",
+      "description": "Inactive member MEM-10004",
+      "request": {
+        "member_id": "MEM-10004",
+        "patient_name": "Riley Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "metformin",
+        "quantity": 30,
+        "days_supply": 30,
+        "bin": "610014",
+        "pcn": "DEMO",
+        "group_id": "GRP-CCC"
+      }
+    },
+    {
+      "id": "quantity_over_limit",
+      "description": "Quantity exceeds plan max -> needs_review",
+      "request": {
+        "member_id": "MEM-10001",
+        "patient_name": "Alex Demo",
+        "date_of_service": "2026-07-15",
+        "pharmacy_npi": "1679576722",
+        "prescriber_npi": "1679576722",
+        "drug_name": "atorvastatin",
+        "quantity": 500,
+        "days_supply": 30,
+        "bin": "610014",
+        "pcn": "DEMO",
+        "group_id": "GRP-AAA"
+      }
+    }
+  ]
+}

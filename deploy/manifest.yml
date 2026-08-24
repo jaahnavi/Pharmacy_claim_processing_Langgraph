@@ -1,0 +1,28 @@
+---
+applications:
+  - name: pharmacy-claim-orchestration
+    memory: 512M
+    instances: 1
+    buildpacks:
+      - python_buildpack
+    command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    path: ..
+    env:
+      APP_HOST: 0.0.0.0
+      LLM_PROVIDER: openai
+      OPENAI_MODEL: gpt-4o-mini
+      LLM1_TEMPERATURE: "0.1"
+      LLM2_TEMPERATURE: "0.2"
+      LLM_TIMEOUT_SECONDS: "30"
+      LLM_FORCE_FALLBACK: "false"
+      CHECKPOINT_DB_PATH: /home/vcap/app/data/checkpoints.sqlite
+      LANGCHAIN_TRACING_V2: "false"
+      LANGCHAIN_PROJECT: pharmacy-claim-orchestration
+      DISCLAIMER: "Educational demo only. Not for real insurance billing, medical advice, or PHI. Use synthetic member/claim data only."
+      HTTP_TIMEOUT_SECONDS: "15"
+      HTTP_MAX_RETRIES: "3"
+      LOG_LEVEL: INFO
+    services: []
+    health-check-type: http
+    health-check-http-endpoint: /health
+    timeout: 180
