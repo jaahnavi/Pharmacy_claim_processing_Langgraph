@@ -28,10 +28,22 @@ class Settings(BaseSettings):
         "Educational demo only. Not for real insurance billing, medical advice, or PHI. "
         "Use synthetic member/claim data only."
     )
+    # Checkpointer backend: sqlite (default, single-instance) | blob (durable, multi-instance, Azure Blob Storage) | memory
+    checkpoint_backend: str = "sqlite"
     checkpoint_db_path: str = "./data/checkpoints.sqlite"
+    # Used only when CHECKPOINT_BACKEND=blob
+    azure_storage_connection_string: str = ""
+    azure_storage_checkpoint_container: str = "langgraph-checkpoints"
     log_level: str = "INFO"
 
-    llm_provider: str = "openai"  # openai | azure
+    # Azure Cosmos DB (NoSQL API) — the finalized claim is upserted here once a
+    # run reaches the terminal finalize_claim node, regardless of outcome.
+    azure_cosmos_endpoint: str = ""
+    azure_cosmos_key: str = ""
+    azure_cosmos_database: str = "pharmacy_claims"
+    azure_cosmos_container: str = "claims"
+
+    llm_provider: str = "openai"  # openai | azure 
 
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"

@@ -8,7 +8,7 @@ Join pattern (fan-out / fan-in):
   Implementation: LangGraph runs both branches from START concurrently when
   multiple edges leave START. A dedicated `fan_in_gate` node is reachable from
   both branches; LangGraph's reducer merges state, then conditional edges route
-  to evaluate_coverage or END.
+  to evaluate_coverage or finalize_claim (terminal persistence, then END).
 
 HITL: interrupt_before=["human_approval"] so the graph pauses after
 draft_reviewer_brief with both LLM outputs available for the examiner.
@@ -30,6 +30,7 @@ from app.graph.nodes.draft_reviewer_brief import draft_reviewer_brief
 from app.graph.nodes.evaluate_coverage import evaluate_coverage
 from app.graph.nodes.fan_in_gate import fan_in_gate
 from app.graph.nodes.fetch_member_record import fetch_member_record
+from app.graph.nodes.finalize_claim import finalize_claim
 from app.graph.nodes.human_approval import human_approval
 from app.graph.nodes.lookup_provider import lookup_provider
 from app.graph.nodes.resolve_drug_info import resolve_drug_info
@@ -60,6 +61,7 @@ def build_graph(checkpointer=None):
     builder.add_node("draft_reviewer_brief", draft_reviewer_brief)
     builder.add_node("human_approval", human_approval)
     builder.add_node("submit_claim", submit_claim)
+    builder.add_node("finalize_claim", finalize_claim)
 
     # Fan-out: parallel from START
     builder.add_edge(START, "fetch_member_record")
@@ -74,7 +76,7 @@ def build_graph(checkpointer=None):
         after_fan_in,
         {
             "evaluate_coverage": "evaluate_coverage",
-            "__end__": END,
+            "__end__": "finalize_claim",
         },
     )
 
@@ -88,10 +90,14 @@ def build_graph(checkpointer=None):
         after_human_approval,
         {
             "submit_claim": "submit_claim",
-            "__end__": END,
+            "__end__": "finalize_claim",
         },
     )
-    builder.add_edge("submit_claim", END)
+    builder.add_edge("submit_claim", "finalize_claim")
+    # Every terminal path — fan-in failure, human reject/changes-requested, or a
+    # successful submission — converges here, which persists the claim to
+    # Cosmos DB before the run actually ends.
+    builder.add_edge("finalize_claim", END)
 
     return builder.compile(
         checkpointer=checkpointer,
@@ -101,12 +107,53 @@ def build_graph(checkpointer=None):
 
 _memory_checkpointer: Optional[MemorySaver] = None
 _sqlite_cm = None
+_blob_checkpointer = None
+
+
+def _build_blob_checkpointer():
+    """Durable checkpointer backed by Azure Blob Storage — safe for multiple app instances.
+
+    Each checkpoint / pending-write is stored as its own blob under the
+    configured container; see ``app.graph.checkpointer_blob.AzureBlobSaver``.
+    The container is created on first use if it does not already exist.
+    """
+    global _blob_checkpointer
+    if _blob_checkpointer is not None:
+        return _blob_checkpointer
+
+    from app.graph.checkpointer_blob import AzureBlobSaver
+
+    settings = get_settings()
+    if not settings.azure_storage_connection_string:
+        raise RuntimeError("CHECKPOINT_BACKEND=blob but AZURE_STORAGE_CONNECTION_STRING is not set")
+
+    _blob_checkpointer = AzureBlobSaver.from_connection_string(
+        settings.azure_storage_connection_string,
+        settings.azure_storage_checkpoint_container,
+    )
+    return _blob_checkpointer
 
 
 def get_checkpointer():
-    """Prefer SQLite for durable HITL resume; fall back to in-memory."""
+    """Return the configured checkpointer.
+
+    CHECKPOINT_BACKEND:
+      - ``blob``    : durable + safe for multiple app instances (Azure Blob Storage; recommended for deploy)
+      - ``sqlite``  : single-instance local file (default; fine for dev / HITL resume)
+      - ``memory``  : ephemeral, lost on restart
+    """
     global _memory_checkpointer, _sqlite_cm
     settings = get_settings()
+    backend = (settings.checkpoint_backend or "sqlite").lower()
+
+    if backend == "blob":
+        return _build_blob_checkpointer()
+
+    if backend == "memory":
+        if _memory_checkpointer is None:
+            _memory_checkpointer = MemorySaver()
+        return _memory_checkpointer
+
     db_path = Path(settings.checkpoint_db_path)
     try:
         db_path.parent.mkdir(parents=True, exist_ok=True)

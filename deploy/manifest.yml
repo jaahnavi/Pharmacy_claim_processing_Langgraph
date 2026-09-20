@@ -15,7 +15,12 @@ applications:
       LLM2_TEMPERATURE: "0.2"
       LLM_TIMEOUT_SECONDS: "30"
       LLM_FORCE_FALLBACK: "false"
+      # For multi-instance HA set CHECKPOINT_BACKEND=blob and AZURE_STORAGE_CONNECTION_STRING (cf set-env), then bump instances.
+      CHECKPOINT_BACKEND: sqlite
       CHECKPOINT_DB_PATH: /home/vcap/app/data/checkpoints.sqlite
+      AZURE_STORAGE_CHECKPOINT_CONTAINER: langgraph-checkpoints
+      AZURE_COSMOS_DATABASE: pharmacy_claims
+      AZURE_COSMOS_CONTAINER: claims
       LANGCHAIN_TRACING_V2: "false"
       LANGCHAIN_PROJECT: pharmacy-claim-orchestration
       DISCLAIMER: "Educational demo only. Not for real insurance billing, medical advice, or PHI. Use synthetic member/claim data only."

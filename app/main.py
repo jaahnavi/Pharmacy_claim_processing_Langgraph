@@ -51,6 +51,7 @@ def health() -> dict:
         "version": __version__,
         "llm_configured": llm_configured(),
         "llm_provider": settings.llm_provider,
+        "checkpoint_backend": settings.checkpoint_backend,
         "langsmith_tracing": settings.langchain_tracing_v2,
         "disclaimer": settings.disclaimer,
         "dependencies": {

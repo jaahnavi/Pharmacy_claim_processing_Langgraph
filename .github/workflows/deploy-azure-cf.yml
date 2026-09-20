@@ -1,0 +1,62 @@
+name: Deploy to Azure Cloud Foundry
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+env:
+  CF_APP_NAME: pharmacy-claim-orchestration
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: pytest -q
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install CF CLI
+        run: |
+          curl -L "https://packages.cloudfoundry.org/stable?release=linux64-binary&source=github" | tar -zx
+          sudo mv cf8 /usr/local/bin/cf || sudo mv cf /usr/local/bin/cf
+          cf version
+
+      - name: CF login
+        run: |
+          cf api "${{ secrets.CF_API }}"
+          cf auth "${{ secrets.CF_USERNAME }}" "${{ secrets.CF_PASSWORD }}"
+          cf target -o "${{ secrets.CF_ORG }}" -s "${{ secrets.CF_SPACE }}"
+
+      - name: Push app
+        run: cf push -f deploy/manifest.yml --no-start
+
+      - name: Set environment variables
+        run: |
+          cf set-env "$CF_APP_NAME" LLM_PROVIDER "${{ vars.LLM_PROVIDER || 'openai' }}"
+          cf set-env "$CF_APP_NAME" OPENAI_API_KEY "${{ secrets.OPENAI_API_KEY }}"
+          cf set-env "$CF_APP_NAME" AZURE_OPENAI_API_KEY "${{ secrets.AZURE_OPENAI_API_KEY }}"
+          cf set-env "$CF_APP_NAME" AZURE_OPENAI_ENDPOINT "${{ secrets.AZURE_OPENAI_ENDPOINT }}"
+          cf set-env "$CF_APP_NAME" AZURE_OPENAI_DEPLOYMENT "${{ secrets.AZURE_OPENAI_DEPLOYMENT }}"
+          cf set-env "$CF_APP_NAME" AZURE_COSMOS_ENDPOINT "${{ secrets.AZURE_COSMOS_ENDPOINT }}"
+          cf set-env "$CF_APP_NAME" AZURE_COSMOS_KEY "${{ secrets.AZURE_COSMOS_KEY }}"
+          cf set-env "$CF_APP_NAME" AZURE_STORAGE_CONNECTION_STRING "${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}"
+          cf set-env "$CF_APP_NAME" LANGCHAIN_API_KEY "${{ secrets.LANGCHAIN_API_KEY }}"
+
+      - name: Start / restage app
+        run: cf start "$CF_APP_NAME"
+
+      - name: Verify
+        run: |
+          cf app "$CF_APP_NAME"
+          curl -sf "$(cf app "$CF_APP_NAME" | grep routes | awk '{print $2}' | sed 's|^|https://|' | head -n1)/health"
